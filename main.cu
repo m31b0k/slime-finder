@@ -30,7 +30,7 @@ __device__ bool isSlimeChunk(long long s, long long x, long long z) {
 }
 
 // Return the square root of x
-__device__ int sqrt(int x) {
+__device__ __host__ int sqrt(int x) {
   if (x == 0 || x == 1) return x;
   int i = 1, result = 1;
   while (result <= x) {
@@ -179,22 +179,8 @@ __device__ int max(int a, int b, int c) {
 }
 
 // Count blocks if slime can spawn there at any x, y, or z position of the player
-__global__ void calcSecondSpawnableBlocks(short* a) {
-/*  int i = threadIdx.x/17;
-  int j = threadIdx.x%17;
-  short count = 0;
-  for (int x=0; x<16; ++x) {
-    for (int z=0; z<16; ++z) {
-      int t0 = i>8 ? i-1 : i;
-      int t1 = j>8 ? j-1 : j;
-      t0 = (t0-8)*16+x;
-      t1 = (t1-8)*16+z;
-      if (sqrt(t0*t0 + t1*t1) <= 128)
-        count++;
-    }
-  }
-  a[i*17+j] = count;
-  return;*/
+void calcSecondSpawnableBlocks(short* a) {
+  for (int i=0; i<17*17; ++i) a[i] = 0;
   for (int xx=-128; xx<145; ++xx) {
     for (int zz=-128; zz<145; ++zz) {
       bool temp = false;
@@ -306,9 +292,11 @@ int main() {
   calcSpawnableBlocks<<<6, 1024>>>(spawnBlocks);
   cudaDeviceSynchronize();
 
+  short *sbsCpu = (short*) malloc(17*17*sizeof(short));
   printf("Calculating second spawnable blocks\n");
-  calcSecondSpawnableBlocks<<<1, 1>>>(spawnBlocksSecond);
+  calcSecondSpawnableBlocks(sbsCpu);
   cudaDeviceSynchronize();
+  cudaMemcpy(spawnBlocksSecond, sbsCpu, 17*17*sizeof(short), cudaMemcpyHostToDevice);
 
   printf("Setting initial X\n");
   setInitialX<<<dim3(1, 3663), dim3(1, 1024)>>>(seed, minx, chunks);
@@ -362,4 +350,5 @@ int main() {
   cudaFree(spawnBlocksSecond);
   free(countt);
   free(location);
+  free(sbsCpu);
 }
