@@ -92,7 +92,7 @@ __global__ void count(int* row, unsigned short* n, int currentMax, short* sb, sh
   // Load the chunks from row
   int chunks[17];
   for (int i=0; i<17; ++i) {
-    chunks[i] = row[z+i] >> 16-x & 0xFFFF;
+    chunks[i] = row[z+i] >> 16-x & 0x1FFFF;
   }
 
   // First count all in a 17x17 area to simplify, if this doesn't succeed, don't check all different locations within that chunk.
