@@ -92,7 +92,7 @@ __global__ void count(int* row, unsigned short* n, int currentMax, short* sb, sh
   // Load the chunks from row
   int chunks[17];
   for (int i=0; i<17; ++i) {
-    chunks[i] = row[z+i] >> 16-x & 0x1FFFF;
+    chunks[i] = row[z+i] >> 15-x & 0x1FFFF;
   }
 
   // First count all in a 17x17 area to simplify, if this doesn't succeed, don't check all different locations within that chunk.
@@ -226,7 +226,7 @@ __global__ void findHighest(unsigned short *c, unsigned short *o, int *l) {
 }
 
 // Inefficient function to move the location and count of the highest chunk to index 0 of c and l
-void findHeighestCpu(unsigned short* c, int* l, unsigned short* oc, int* cl) {
+void findHighestCpu(unsigned short* c, int* l, unsigned short* oc, int* cl) {
   cudaMemcpy(c, oc, 58608 * sizeof(short), cudaMemcpyDeviceToHost);
   cudaMemcpy(l, cl, 58608 * sizeof(int), cudaMemcpyDeviceToHost);
   
@@ -310,7 +310,7 @@ int main() {
   findHighest<<<3663 * 16, 1024>>>(chunkCount, outCount, chunkLocation);
   cudaDeviceSynchronize();
 
-  findHeighestCpu(countt, location, outCount, chunkLocation);
+  findHighestCpu(countt, location, outCount, chunkLocation);
   //printf("Start value - start chunk: %u - %u\n", countt[0], location[0]);
   if (countt[0] > heighest) {
     printf("New heighest in first row: %u - %u\n", countt[0], location[0]);
@@ -333,7 +333,7 @@ int main() {
     findHighest<<<3663 * 16, 1024>>>(chunkCount, outCount, chunkLocation);
     cudaDeviceSynchronize();
 
-    findHeighestCpu(countt, location, outCount, chunkLocation);
+    findHighestCpu(countt, location, outCount, chunkLocation);
     if (countt[0] > heighest) {
       printf("New heighest value: %u - %u with i %d, absolute location: %d, %d\n", countt[0], location[0], i, location[0]%16*16+i*16, location[0]/16*16-30000000);
       heighest = countt[0];
