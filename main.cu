@@ -254,6 +254,7 @@ int main() {
   cudaMalloc((void**)&chunkCount, sizeof(short) * 3750000 * 16);
   short int *spawnBlocks; // A list with the amount of spawnable blocks in each chunk for each position in the chunk and each height
   cudaMalloc((void**)&spawnBlocks, sizeof(short int) * 17*17 * 16*16*24);
+  cudaMemset(spawnBlocks, 0, sizeof(short int) * 17*17 * 16*16*24);
   int *chunkLocation; // The location of the chunk corresponding to the count in chunkCount. Format is z*16+x
   cudaMalloc((void**)&chunkLocation, sizeof(int) * 3663 * 16);
   unsigned short *outCount; // The output of the findHeighest function
