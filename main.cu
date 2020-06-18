@@ -5,13 +5,6 @@
 // https://docs.oracle.com/javase/7/docs/api/java/util/Random.html
 // http://developer.classpath.org/doc/java/util/Random-source.html
 __device__ bool isSlimeChunk(long long s, long long x, long long z) {
-  /*unsigned long long seed = ((s +
-      (int) (x * x * 0x4c1906LL) +
-      (int) (x * 0x5ac0dbLL) +
-      (int) (z * z) * 0x4307a7LL +
-      (int) (z * 0x5f24fLL) ^ 0x3ad8025f)
-      ^ 0x5DEECE66DLL) & ((1LL << 48) - 1);*/
-  
   unsigned long long seed = (s +
       (int) (x * x * 0x4c1906LL) +
       (int) (x * 0x5ac0dbLL) +
@@ -170,12 +163,6 @@ __global__ void calcSpawnableBlocks(short int* f) {
       }
     }
   }
-}
-
-// Return the heighest value of a, b and c
-__device__ int max(int a, int b, int c) {
-  int t = a>b?a:b;
-  return t>c?t:c;
 }
 
 // Count blocks if slime can spawn there at any x, y, or z position of the player
