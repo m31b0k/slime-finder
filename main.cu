@@ -79,7 +79,7 @@ __global__ void count(int* row, unsigned short* n, int currentMax, short* sb, sh
   int x = blockIdx.x * blockDim.x;
   int z = blockIdx.y * blockDim.y + threadIdx.y;
 
-  // Avoid going too high and trying to access not available memory
+  // Avoid going too high and trying to access unavailable memory
   if (z >= 3750000) return;
 
   // Load the chunks from row
@@ -106,10 +106,8 @@ __global__ void count(int* row, unsigned short* n, int currentMax, short* sb, sh
     }
   }
   sum = 0;
-  for (int i=0; i<17; ++i) {
-    for (int j=0; j<17; ++j) {
-      sum += cl[i*17+j]==1 ? sbs[i*17+j] : 0;
-    }
+  for (int i=0; i<289; ++i) {
+      sum += cl[i]==1 ? sbs[i] : 0;
   }
   if (sum <= currentMax) {
     n[16*z+x] = 0;
@@ -117,26 +115,22 @@ __global__ void count(int* row, unsigned short* n, int currentMax, short* sb, sh
   }
 
   // Calculate different rates for all heights and positions inside the chunk
-  short heighest = 0;
-  for (int X=0; X<16; ++X) {
-    for (int Z=0; Z<16; ++Z) {
-      for (int y=0; y<24; ++y) {
-        sum = 0;
-        for (int i=0; i<17; ++i) {
-          for (int j=0; j<17; ++j) {
-            sum += cl[i*17+j]==1 ? sb[x*110976+Z*6936+y*289+i*17+j] : 0;
-          }
-        }
-        if (sum > heighest) {
-          heighest = sum;
-        }
-      }
+  // Each value of j is a new height and/or position inside the chunk
+  // Each value of i is the coordinates for a chunk around the chunk the player is in
+  short highest = 0;
+  for (int j=0; j<6144; ++j) {
+    sum = 0;
+    for (int i=0; i<289; ++i) {
+      sum += cl[i]==1 ? sb[j*289+i] : 0;
+    }
+    if (sum > highest) {
+      highest = sum;
     }
   }
 
-  if (heighest > currentMax) {
-    //printf("%u,%u - %u\n",x,z,heighest);
-    n[16*z+x] = heighest;
+  if (highest > currentMax) {
+    //printf("%u,%u - %u\n",x,z,highest);
+    n[16*z+x] = highest;
   } else {
     n[16*z+x] = 0;
   }
@@ -217,10 +211,10 @@ void findHighestCpu(unsigned short* c, int* l, unsigned short* oc, int* cl) {
   cudaMemcpy(c, oc, 58608 * sizeof(short), cudaMemcpyDeviceToHost);
   cudaMemcpy(l, cl, 58608 * sizeof(int), cudaMemcpyDeviceToHost);
   
-  unsigned short heighest = 0;
-  for (int i=0; i<58608; ++i) heighest = c[i]>heighest ? c[i] : heighest;
+  unsigned short highest = 0;
+  for (int i=0; i<58608; ++i) highest = c[i]>highest ? c[i] : highest;
   for (int i=0; i<58608; ++i) {
-    if (c[i] == heighest) {
+    if (c[i] == highest) {
       c[0] = c[i];
       l[0] = l[i];
       return;
@@ -235,6 +229,7 @@ void printError() {
 }
 
 int main() {
+  // Cuda variables
   int *chunks; // Each bit represents a chunk. 1 if the chunk is a slime chunk, otherwise 0
   cudaMalloc((void**)&chunks, sizeof(int) * 3750912);
   unsigned short *chunkCount; // The amount of blocks slimes can spawn on in a 17x17 area centered around the player
@@ -244,7 +239,7 @@ int main() {
   cudaMemset(spawnBlocks, 0, sizeof(short int) * 17*17 * 16*16*24);
   int *chunkLocation; // The location of the chunk corresponding to the count in chunkCount. Format is z*16+x
   cudaMalloc((void**)&chunkLocation, sizeof(int) * 3663 * 16);
-  unsigned short *outCount; // The output of the findHeighest function
+  unsigned short *outCount; // The output of the findHighest function
   cudaMalloc((void**)&outCount, sizeof(short) * 3663 * 16);
   short *spawnBlocksSecond; // Combination of all possible heights and positions of spawnBlocks
   cudaMalloc((void**)&spawnBlocksSecond, sizeof(short) * 17 * 17);
@@ -258,7 +253,7 @@ int main() {
   char temp[8] = {0};
   int minx = -1875000;
   int maxx = 1875000;
-  int heighest = 0;
+  int highest = 0;
   printf("Enter seed: ");
   scanf("%d", &seed);
   printf("Enter x start (min is -1875000) ('d' for default -1875000): ");
@@ -273,8 +268,8 @@ int main() {
     printf("Illegal minx or maxx, range is -1875000 to 1875000 and minx must be smaller than maxx");
     return 1;
   }
-  printf("Enter heighest to begin with: ");
-  scanf("%d", &heighest);
+  printf("Enter highest to begin with: ");
+  scanf("%d", &highest);
 
   printf("Calculating spawnable blocks\n");  
   calcSpawnableBlocks<<<6, 1024>>>(spawnBlocks);
@@ -291,45 +286,41 @@ int main() {
   cudaDeviceSynchronize();
 
   printf("Counting slime chunks/blocks\n");
-  count<<<dim3(16, 3663), dim3(1, 1024)>>>(chunks,chunkCount,heighest,spawnBlocks,spawnBlocksSecond);
+  count<<<dim3(16, 3663), dim3(1, 1024)>>>(chunks,chunkCount,highest,spawnBlocks,spawnBlocksSecond);
   cudaDeviceSynchronize();
 
-  printf("Finding heighest chunk\n");
+  printf("Finding highest chunk\n");
   findHighest<<<3663 * 16, 1024>>>(chunkCount, outCount, chunkLocation);
   cudaDeviceSynchronize();
 
   findHighestCpu(countt, location, outCount, chunkLocation);
-  //printf("Start value - start chunk: %u - %u\n", countt[0], location[0]);
-  if (countt[0] > heighest) {
-    printf("New heighest in first row: %u - %u\n", countt[0], location[0]);
-    heighest = countt[0];
+  if (countt[0] > highest) {
+    printf("New highest in first row: %u - %u\n", countt[0], location[0]);
+    highest = countt[0];
+  } else {
+    printf("No new highest in first row, continuing with %d\n", highest);
   }
-
-  printError();
 
   printf("Starting computation of other chunks\n");
 
-  //for (int i = -1874984; i < 1875000; i += 16) {
-  //for (int i = -1874984; i < -1870000; i += 16) {
   for (int i = minx+16; i < maxx; i += 16) {
     setX<<<dim3(1, 3663), dim3(1, 1024)>>>(seed, i, chunks);
     cudaDeviceSynchronize();
 
-    count<<<dim3(16, 3663), dim3(1, 1024)>>>(chunks,chunkCount,heighest,spawnBlocks,spawnBlocksSecond);
+    count<<<dim3(16, 3663), dim3(1, 1024)>>>(chunks,chunkCount,highest,spawnBlocks,spawnBlocksSecond);
     cudaDeviceSynchronize();
 
     findHighest<<<3663 * 16, 1024>>>(chunkCount, outCount, chunkLocation);
     cudaDeviceSynchronize();
 
     findHighestCpu(countt, location, outCount, chunkLocation);
-    if (countt[0] > heighest) {
-      printf("New heighest value: %u - %u with i %d, absolute location: %d, %d\n", countt[0], location[0], i, location[0]%16*16+i*16, location[0]/16*16-30000000);
-      heighest = countt[0];
+    if (countt[0] > highest) {
+      printf("New highest value: %u - %u with i %d, absolute location: %d, %d\n", countt[0], location[0], i, location[0]%16*16+i*16, location[0]/16*16-30000000);
+      highest = countt[0];
     }
-
-    printError();
   }
 
+  // Freeing memory
   cudaFree(chunks);
   cudaFree(chunkCount);
   cudaFree(spawnBlocks);
